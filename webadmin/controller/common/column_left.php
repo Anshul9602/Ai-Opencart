@@ -775,6 +775,17 @@ class ColumnLeft extends \Opencart\System\Engine\Controller {
 				];
 			}
 
+			// Website Builder
+			if ($this->config->get('other_ai_builder_status') && $this->user->hasPermission('access', 'extension/ai_builder/other/ai_builder')) {
+				$data['menus'][] = [
+					'id'       => 'menu-website-builder',
+					'icon'     => 'fas fa-wand-magic-sparkles',
+					'name'     => 'Website Builder',
+					'href'     => $this->url->link('extension/ai_builder/other/ai_builder.chat', 'user_token=' . $this->session->data['user_token']),
+					'children' => []
+				];
+			}
+
 			$report = [];
 
 			if ($this->user->hasPermission('access', 'report/report')) {

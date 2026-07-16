@@ -1,0 +1,8 @@
+{
+  "name": "AI Website Builder Assistant",
+  "description": "AI-powered chat assistant for managing your entire OpenCart store through natural language commands.",
+  "code": "ai_builder",
+  "version": "1.0.4",
+  "author": "AI Builder Team",
+  "link": "https://github.com/ai-builder/opencart-extension"
+}

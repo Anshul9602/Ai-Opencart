@@ -1,7 +1,75 @@
 {{ header }}
-<div id="common-home" class="container">
-  <div class="row">{{ column_left }}
-    <div id="content" class="col">{{ content_top }}{{ content_bottom }}</div>
+<section class="ai-hero">
+  <div class="container">
+    <div class="row align-items-center">
+      <div class="col-lg-6 ai-hero-content">
+        <div class="ai-hero-badge">
+          <span class="pulse-dot"></span>
+          New Collection 2026
+        </div>
+        <h1>Discover <span class="gradient-text">Premium</span> Products You'll Love</h1>
+        <p>Shop the latest trends with fast delivery, secure checkout, and unbeatable quality. Your perfect find is just a click away.</p>
+        <div class="ai-hero-actions">
+          <a href="#content" class="ai-btn-primary"><i class="fa-solid fa-bag-shopping"></i> Shop Now</a>
+          <a href="{{ special }}" class="ai-btn-outline"><i class="fa-solid fa-tags"></i> View Deals</a>
+        </div>
+        <div class="ai-hero-stats">
+          <div class="ai-hero-stat">
+            <h3><span class="ai-counter" data-target="500" data-suffix="+">0+</span></h3>
+            <p>Products</p>
+          </div>
+          <div class="ai-hero-stat">
+            <h3><span class="ai-counter" data-target="10" data-suffix="K+">0K+</span></h3>
+            <p>Happy Customers</p>
+          </div>
+          <div class="ai-hero-stat">
+            <h3><span class="ai-counter" data-target="99" data-suffix="%">0%</span></h3>
+            <p>Satisfaction</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-6 ai-hero-visual d-none d-lg-block">
+        <div class="ai-hero-card text-center">
+          <i class="fa-solid fa-truck-fast"></i>
+          <h4>Free Shipping</h4>
+          <p>On orders over $50 — delivered to your door in 2-3 days</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="ai-features">
+  <div class="container">
+    <div class="row g-4">
+      <div class="col-md-4">
+        <div class="ai-feature-card ai-animate">
+          <div class="icon-wrap"><i class="fa-solid fa-truck-fast"></i></div>
+          <h5>Fast Delivery</h5>
+          <p>Free shipping on qualifying orders with express delivery options</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="ai-feature-card ai-animate ai-animate-delay-1">
+          <div class="icon-wrap"><i class="fa-solid fa-shield-halved"></i></div>
+          <h5>Secure Payment</h5>
+          <p>100% secure checkout with encrypted payment processing</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="ai-feature-card ai-animate ai-animate-delay-2">
+          <div class="icon-wrap"><i class="fa-solid fa-rotate-left"></i></div>
+          <h5>Easy Returns</h5>
+          <p>30-day hassle-free return policy on all purchases</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div id="common-home" class="container-fluid px-0">
+  <div class="row g-0">{{ column_left }}
+    <div id="content" class="col px-3 px-md-4">{{ content_top }}{{ content_bottom }}</div>
     {{ column_right }}</div>
 </div>
 {{ footer }}

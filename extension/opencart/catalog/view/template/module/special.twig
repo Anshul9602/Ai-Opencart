@@ -1,6 +1,14 @@
-<h3>{{ heading_title }}</h3>
-<div class="row{% if axis == 'horizontal' %} row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-xl-4{% endif %}">
-  {% for product in products %}
-    <div class="col mb-3">{{ product }}</div>
-  {% endfor %}
-</div>
+<section class="ai-section" style="background: var(--ai-surface);">
+  <div class="container">
+    <div class="ai-section-header ai-animate">
+      <span class="ai-label">Limited Time</span>
+      <h2>{{ heading_title }}</h2>
+      <p>Grab these deals before they're gone</p>
+    </div>
+    <div class="row{% if axis == 'horizontal' %} row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-xl-4{% endif %} g-4">
+      {% for product in products %}
+        <div class="col">{{ product }}</div>
+      {% endfor %}
+    </div>
+  </div>
+</section>

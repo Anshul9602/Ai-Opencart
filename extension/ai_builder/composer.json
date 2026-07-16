@@ -1,0 +1,15 @@
+{
+  "name": "ai-builder/opencart-extension",
+  "description": "OpenCart 4 AI Website Builder Assistant Extension",
+  "type": "opencart-extension",
+  "license": "MIT",
+  "version": "1.0.0",
+  "require": {
+    "php": ">=8.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "Opencart\\System\\Library\\Extension\\AiBuilder\\": "system/library/"
+    }
+  }
+}

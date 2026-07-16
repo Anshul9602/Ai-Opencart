@@ -29,6 +29,7 @@ class Home extends \Opencart\System\Engine\Controller {
 		$data['content_bottom'] = $this->load->controller('common/content_bottom');
 		$data['footer'] = $this->load->controller('common/footer');
 		$data['header'] = $this->load->controller('common/header');
+		$data['special'] = $this->url->link('product/special', 'language=' . $this->config->get('config_language'));
 
 		$this->response->setOutput($this->load->view('common/home', $data));
 	}
