@@ -101,6 +101,8 @@ class AiBuilder extends \Opencart\System\Engine\Controller {
 		if (!$json) {
 			$message = trim($this->request->post['message'] ?? '');
 			$session_id = (int)($this->request->post['session_id'] ?? 0);
+			$selection_id = trim($this->request->post['selection_id'] ?? '');
+			$selection_type = trim($this->request->post['selection_type'] ?? '');
 			$confirmed = (bool)($this->request->post['confirmed'] ?? false);
 
 			if (!$message) {
@@ -133,7 +135,7 @@ class AiBuilder extends \Opencart\System\Engine\Controller {
 						(float)($this->config->get('other_ai_builder_temperature') ?: 0.3)
 					);
 
-					$result = $orchestrator->process($message, $history, $state, $confirmed);
+					$result = $orchestrator->process($message, $history, $state, $confirmed, $selection_id, $selection_type);
 
 					$this->model_extension_ai_builder_other_ai_builder->addMessage(
 						$session_id,
@@ -302,6 +304,25 @@ class AiBuilder extends \Opencart\System\Engine\Controller {
 		$this->response->addHeader('Content-Type: text/csv');
 		$this->response->addHeader('Content-Disposition: attachment; filename="product_import_template.csv"');
 		$this->response->setOutput(CsvValidator::getTemplate());
+	}
+
+	public function capabilities(): void {
+		$this->ensureLibraryAutoloader();
+		$json = [];
+
+		if (!$this->user->hasPermission('access', 'extension/ai_builder/other/ai_builder')) {
+			$json['error'] = 'Permission denied';
+		} else {
+			$registry = \Opencart\System\Library\Extension\AiBuilder\Capability\CapabilityRegistry::getInstance();
+
+			$json['total'] = count($registry->all());
+			$json['implemented'] = count($registry->implemented());
+			$json['planned'] = count($registry->planned());
+			$json['capabilities'] = $registry->toJson();
+		}
+
+		$this->response->addHeader('Content-Type: application/json');
+		$this->response->setOutput(json_encode($json));
 	}
 
 	public function save(): void {

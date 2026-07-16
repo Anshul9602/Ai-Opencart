@@ -4,7 +4,10 @@
 (function ($) {
   'use strict';
 
-  var CFG = window.AI_BUILDER || {};
+  function cfg() {
+    return window.AI_BUILDER || {};
+  }
+
   var sessionId = 0;
   var isLoading = false;
 
@@ -54,10 +57,21 @@
 
     initDragDrop();
 
-    $('#messages').on('click', '.ai-card', function () {
-      var title = $(this).find('.ai-card-title').text();
-      var id = $(this).data('id');
-      sendMessage(id ? String(id) : title);
+    $('#messages').on('click', '.ai-card', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (isLoading) return;
+
+      var $card = $(this);
+      var title = $card.find('.ai-card-title').text().trim();
+      var id = $card.attr('data-id');
+      var type = $card.attr('data-type') || 'banner';
+
+      if (!id) return;
+
+      $('.ai-card').removeClass('selected');
+      $card.addClass('selected');
+      sendMessage(title, id, type);
     });
 
     $('#messages').on('click', '.ai-option', function () {
@@ -104,10 +118,10 @@
     });
   }
 
-  function sendMessage() {
-    if (isLoading || !CFG.api_configured) return;
+  function sendMessage(overrideMessage, selectionId, selectionType) {
+    if (isLoading || !cfg().api_configured) return;
 
-    var message = $('#message-input').val().trim();
+    var message = (overrideMessage || $('#message-input').val()).trim();
     if (!message) return;
 
     $('.ai-welcome').remove();
@@ -119,9 +133,14 @@
     $('#typing-indicator').prop('hidden', false);
 
     $.ajax({
-      url: CFG.url_send,
+      url: cfg().url_send,
       type: 'POST',
-      data: { message: message, session_id: sessionId },
+      data: {
+        message: message,
+        session_id: sessionId,
+        selection_id: selectionId || '',
+        selection_type: selectionType || ''
+      },
       dataType: 'json',
       success: function (json) {
         if (json.session_id) sessionId = json.session_id;
@@ -148,8 +167,13 @@
   }
 
   function handleResponse(json) {
-    if (json.error) {
+    if (json.error && json.error !== true) {
       appendMessage('assistant', json.message || json.error);
+      return;
+    }
+
+    if (json.error === true && json.message) {
+      appendMessage('assistant', json.message);
       return;
     }
 
@@ -176,7 +200,8 @@
       case 'cards':
         html = '<div class="ai-cards">';
         (ui.items || []).forEach(function (item) {
-          html += '<div class="ai-card" data-id="' + (item.id || '') + '">';
+          var cardType = ui.item_type || item.type || 'banner';
+          html += '<div class="ai-card" data-id="' + (item.id || '') + '" data-type="' + esc(cardType) + '">';
           if (item.preview) html += '<img class="ai-card-img" src="' + item.preview + '" alt=""/>';
           html += '<div class="ai-card-body">';
           html += '<div class="ai-card-title">' + esc(item.title || '') + '</div>';
@@ -237,7 +262,7 @@
     $('#typing-indicator').prop('hidden', false);
 
     $.ajax({
-      url: CFG.url_confirm,
+      url: cfg().url_confirm,
       type: 'POST',
       data: {
         action: action,
@@ -266,7 +291,7 @@
     appendMessage('user', '[Uploaded: ' + file.name + ']');
 
     $.ajax({
-      url: CFG.url_upload,
+      url: cfg().url_upload,
       type: 'POST',
       data: formData,
       processData: false,
@@ -301,7 +326,7 @@
   }
 
   function newSession() {
-    $.post(CFG.url_new_session, function (json) {
+    $.post(cfg().url_new_session, function (json) {
       sessionId = json.session_id || 0;
       $('#messages').html(
         '<div class="ai-welcome">' +
@@ -315,7 +340,7 @@
   }
 
   function loadSessions() {
-    $.get(CFG.url_sessions, function (json) {
+    $.get(cfg().url_sessions, function (json) {
       var html = '';
       (json.sessions || []).forEach(function (s) {
         var active = s.session_id == sessionId ? ' active' : '';
@@ -327,7 +352,7 @@
 
   function loadHistory(sid) {
     sessionId = sid;
-    $.get(CFG.url_history + '&session_id=' + sid, function (json) {
+    $.get(cfg().url_history + '&session_id=' + sid, function (json) {
       $('#messages').empty();
       (json.messages || []).forEach(function (m) {
         if (m.role === 'user' || m.role === 'assistant') {
