@@ -52,6 +52,9 @@ if (is_file(DIR_STORAGE . 'vendor/symfony/deprecation-contracts/function.php')) 
 	require_once(DIR_STORAGE . 'vendor/symfony/deprecation-contracts/function.php');
 }
 
+// symfony/filesystem
+$autoloader->register('Symfony\Component\Filesystem', DIR_STORAGE . 'vendor/symfony/filesystem//', true);
+
 // symfony/polyfill-ctype
 $autoloader->register('Symfony\Polyfill\Ctype', DIR_STORAGE . 'vendor/symfony/polyfill-ctype//', true);
 if (is_file(DIR_STORAGE . 'vendor/symfony/polyfill-ctype/bootstrap.php')) {
@@ -64,10 +67,10 @@ if (is_file(DIR_STORAGE . 'vendor/symfony/polyfill-mbstring/bootstrap.php')) {
 	require_once(DIR_STORAGE . 'vendor/symfony/polyfill-mbstring/bootstrap.php');
 }
 
-// symfony/polyfill-php81
-$autoloader->register('Symfony\Polyfill\Php81', DIR_STORAGE . 'vendor/symfony/polyfill-php81//', true);
-if (is_file(DIR_STORAGE . 'vendor/symfony/polyfill-php81/bootstrap.php')) {
-	require_once(DIR_STORAGE . 'vendor/symfony/polyfill-php81/bootstrap.php');
+// symfony/polyfill-php80
+$autoloader->register('Symfony\Polyfill\Php80', DIR_STORAGE . 'vendor/symfony/polyfill-php80//', true);
+if (is_file(DIR_STORAGE . 'vendor/symfony/polyfill-php80/bootstrap.php')) {
+	require_once(DIR_STORAGE . 'vendor/symfony/polyfill-php80/bootstrap.php');
 }
 
 // twig/twig
