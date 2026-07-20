@@ -56,7 +56,7 @@ class AiBuilder extends \Opencart\System\Engine\Controller {
 		$this->load->language('extension/ai_builder/other/ai_builder');
 
 		$this->document->setTitle($this->language->get('heading_title'));
-		$this->document->addStyle('../extension/ai_builder/admin/view/stylesheet/chat.css');
+		$this->document->addStyle('../extension/ai_builder/admin/view/stylesheet/chat.css?v=2.6.0');
 		$this->document->addLink('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap', 'stylesheet');
 
 		$data['heading_title'] = $this->language->get('heading_title');
@@ -79,11 +79,12 @@ class AiBuilder extends \Opencart\System\Engine\Controller {
 		$data['url_new_session'] = $this->url->link('extension/ai_builder/other/ai_builder.newSession', 'user_token=' . $this->session->data['user_token'], true);
 		$data['url_csv_template'] = $this->url->link('extension/ai_builder/other/ai_builder.csvTemplate', 'user_token=' . $this->session->data['user_token'], true);
 		$data['url_settings'] = $this->url->link('extension/ai_builder/other/ai_builder', 'user_token=' . $this->session->data['user_token']);
+		$data['url_dashboard'] = $this->url->link('common/dashboard', 'user_token=' . $this->session->data['user_token']);
 
 		$data['api_configured'] = (bool)$this->config->get('other_ai_builder_api_key');
 
 		$data['header'] = $this->load->controller('common/header');
-		$data['column_left'] = $this->load->controller('common/column_left');
+		$data['column_left'] = '';
 		$data['footer'] = $this->load->controller('common/footer');
 
 		$this->response->setOutput($this->load->view('extension/ai_builder/other/chat', $data));
@@ -137,6 +138,28 @@ class AiBuilder extends \Opencart\System\Engine\Controller {
 
 					$result = $orchestrator->process($message, $history, $state, $confirmed, $selection_id, $selection_type);
 
+					$session_state = array_merge($state, $result['state'] ?? [], [
+						'last_user_message' => $message
+					]);
+
+					foreach (['pending_field', 'pending_action', 'entity_type', 'needs_input'] as $field) {
+						if (isset($result[$field])) {
+							$session_state[$field] = $result[$field];
+						}
+					}
+
+					if (empty($result['needs_input'])) {
+						unset($session_state['needs_input']);
+						unset($session_state['pending_field']);
+						unset($session_state['pending_action']);
+					}
+
+					foreach (['selected_product_id', 'awaiting_product_image_for', 'target_product_name', 'current_product_image', 'step'] as $field) {
+						if (array_key_exists($field, $result['state'] ?? [])) {
+							$session_state[$field] = $result['state'][$field];
+						}
+					}
+
 					$this->model_extension_ai_builder_other_ai_builder->addMessage(
 						$session_id,
 						'assistant',
@@ -144,8 +167,8 @@ class AiBuilder extends \Opencart\System\Engine\Controller {
 						['ui' => $result['ui'] ?? [], 'intent' => $result['intent'] ?? '']
 					);
 
-					if (!empty($result['state'])) {
-						$this->model_extension_ai_builder_other_ai_builder->updateSessionState($session_id, $result['state']);
+					if (!empty($result['state']) || $session_state !== $state) {
+						$this->model_extension_ai_builder_other_ai_builder->updateSessionState($session_id, $session_state);
 					}
 
 					$this->model_extension_ai_builder_other_ai_builder->addAudit([
@@ -169,8 +192,17 @@ class AiBuilder extends \Opencart\System\Engine\Controller {
 			}
 		}
 
-		$this->response->addHeader('Content-Type: application/json');
-		$this->response->setOutput(json_encode($json));
+		$this->response->addHeader('Content-Type: application/json; charset=utf-8');
+		$encoded = json_encode($json, JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE);
+
+		if ($encoded === false) {
+			$encoded = json_encode([
+				'error'   => true,
+				'message' => 'Could not encode response: ' . json_last_error_msg()
+			]);
+		}
+
+		$this->response->setOutput($encoded);
 	}
 
 	public function upload(): void {
@@ -186,36 +218,63 @@ class AiBuilder extends \Opencart\System\Engine\Controller {
 		}
 
 		if (!$json) {
-			$session_id = (int)($this->request->post['session_id'] ?? 0);
+			try {
+				$session_id = (int)($this->request->post['session_id'] ?? 0);
 
-			$this->load->model('extension/ai_builder/other/ai_builder');
+				$this->load->model('extension/ai_builder/other/ai_builder');
 
-			$state = [];
+				$state = [];
 
-			if ($session_id) {
-				$session = $this->model_extension_ai_builder_other_ai_builder->getSession($session_id, $this->user->getId());
-				$state = json_decode($session['state'] ?? '{}', true) ?: [];
+				if ($session_id) {
+					$session = $this->model_extension_ai_builder_other_ai_builder->getSession($session_id, $this->user->getId());
+					$state = json_decode($session['state'] ?? '{}', true) ?: [];
+				}
+
+				$orchestrator = new Orchestrator(
+					$this->registry,
+					$this->config->get('other_ai_builder_api_key') ?: ''
+				);
+
+				$result = $orchestrator->handleUpload($this->request->files['file'], $state);
+
+				if ($session_id && !empty($result['state'])) {
+					$session_state = array_merge($state, $result['state']);
+
+					if (!empty($result['success']) && ($result['state']['step'] ?? '') === 'completed') {
+						unset(
+							$session_state['awaiting_product_image_for'],
+							$session_state['pending_field'],
+							$session_state['pending_action'],
+							$session_state['needs_input']
+						);
+					}
+
+					$this->model_extension_ai_builder_other_ai_builder->updateSessionState($session_id, $session_state);
+					$this->model_extension_ai_builder_other_ai_builder->addMessage($session_id, 'user', '[Uploaded file: ' . $this->request->files['file']['name'] . ']');
+					$this->model_extension_ai_builder_other_ai_builder->addMessage($session_id, 'assistant', $result['message'] ?? 'File processed.');
+				}
+
+				$json = $result;
+				$json['session_id'] = $session_id;
+			} catch (\Throwable $e) {
+				$json = [
+					'error'   => true,
+					'message' => 'Upload failed: ' . $e->getMessage()
+				];
 			}
-
-			$orchestrator = new Orchestrator(
-				$this->registry,
-				$this->config->get('other_ai_builder_api_key') ?: ''
-			);
-
-			$result = $orchestrator->handleUpload($this->request->files['file'], $state);
-
-			if ($session_id && !empty($result['state'])) {
-				$this->model_extension_ai_builder_other_ai_builder->updateSessionState($session_id, $result['state']);
-				$this->model_extension_ai_builder_other_ai_builder->addMessage($session_id, 'user', '[Uploaded file: ' . $this->request->files['file']['name'] . ']');
-				$this->model_extension_ai_builder_other_ai_builder->addMessage($session_id, 'assistant', $result['message'] ?? 'File processed.');
-			}
-
-			$json = $result;
-			$json['session_id'] = $session_id;
 		}
 
-		$this->response->addHeader('Content-Type: application/json');
-		$this->response->setOutput(json_encode($json));
+		$this->response->addHeader('Content-Type: application/json; charset=utf-8');
+		$encoded = json_encode($json, JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE);
+
+		if ($encoded === false) {
+			$encoded = json_encode([
+				'error'   => true,
+				'message' => 'Could not encode response: ' . json_last_error_msg()
+			]);
+		}
+
+		$this->response->setOutput($encoded);
 	}
 
 	public function confirm(): void {
@@ -242,6 +301,23 @@ class AiBuilder extends \Opencart\System\Engine\Controller {
 				if ($session_id) {
 					$session = $this->model_extension_ai_builder_other_ai_builder->getSession($session_id, $this->user->getId());
 					$state = json_decode($session['state'] ?? '{}', true) ?: [];
+
+					$messages = $this->model_extension_ai_builder_other_ai_builder->getMessages($session_id);
+
+					for ($i = count($messages) - 1; $i >= 0; $i--) {
+						if (($messages[$i]['role'] ?? '') === 'user') {
+							$state['last_user_message'] = $messages[$i]['content'] ?? '';
+							break;
+						}
+					}
+				}
+
+				if (empty($params) && !empty($state['pending_params'])) {
+					$params = $state['pending_params'];
+				}
+
+				if (empty($action) && !empty($state['pending_action'])) {
+					$action = $state['pending_action'];
 				}
 
 				$orchestrator = new Orchestrator($this->registry, $this->config->get('other_ai_builder_api_key') ?: '');

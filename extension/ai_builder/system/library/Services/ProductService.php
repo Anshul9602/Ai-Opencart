@@ -63,66 +63,61 @@ class ProductService {
 	}
 
 	public function create(array $data): array {
-		$loader = $this->registry->get('load');
-		$loader->model('catalog/product');
-		$model = $this->registry->get('model_catalog_product');
-		$config = $this->registry->get('config');
-		$language_id = (int)$config->get('config_language_id');
+		try {
+			$name = trim((string)($data['name'] ?? ''));
 
-		$product_data = [
-			'model'            => $data['model'] ?? '',
-			'sku'              => $data['sku'] ?? '',
-			'price'            => (float)($data['price'] ?? 0),
-			'quantity'         => (int)($data['quantity'] ?? 0),
-			'status'           => (int)($data['status'] ?? 1),
-			'image'            => $data['image'] ?? '',
-			'product_description' => [
-				$language_id => [
-					'name'             => $data['name'] ?? '',
-					'description'      => $data['description'] ?? '',
-					'meta_title'       => $data['meta_title'] ?? $data['name'] ?? '',
-					'meta_description' => $data['meta_description'] ?? '',
-					'meta_keyword'     => $data['meta_keyword'] ?? '',
-					'tag'              => ''
-				]
-			],
-			'product_store'    => [0],
-			'product_category' => $data['categories'] ?? [],
-			'manufacturer_id' => (int)($data['manufacturer_id'] ?? 0),
-			'tax_class_id'     => 0,
-			'minimum'          => 1,
-			'subtract'         => 1,
-			'stock_status_id'  => 7,
-			'shipping'         => 1,
-			'points'           => 0,
-			'weight'           => 0,
-			'weight_class_id'  => 1,
-			'length'           => 0,
-			'width'            => 0,
-			'height'           => 0,
-			'length_class_id'  => 1,
-			'product_attribute' => [],
-			'product_option'   => [],
-			'product_discount' => [],
-			'product_special'  => !empty($data['special_price']) ? [[
-				'customer_group_id' => 1,
-				'priority'          => 1,
-				'price'             => (float)$data['special_price'],
-				'date_start'        => '',
-				'date_end'          => ''
-			]] : [],
-			'product_image'    => [],
-			'product_download' => [],
-			'product_filter'   => [],
-			'product_related'  => [],
-			'product_reward'   => [],
-			'product_layout'   => [],
-			'product_seo_url'  => !empty($data['seo_url']) ? [0 => [$language_id => $data['seo_url']]] : []
-		];
+			if ($name === '') {
+				return ['error' => 'Product name is required.'];
+			}
 
-		$product_id = $model->addProduct($product_data);
+			$language_id = $this->getLanguageId();
+			$model_name = trim((string)($data['model'] ?? ''));
 
-		return ['success' => true, 'message' => 'Product created successfully.', 'product_id' => $product_id];
+			if ($model_name === '') {
+				$model_name = preg_replace('/[^a-z0-9]+/i', '-', strtolower($name)) ?: 'product';
+				$model_name = substr($model_name, 0, 40) . '-' . time();
+			}
+
+			$product_data = $this->buildProductPayload([
+				'model'            => $model_name,
+				'sku'              => $data['sku'] ?? '',
+				'price'            => (float)($data['price'] ?? 0),
+				'quantity'         => (int)($data['quantity'] ?? 0),
+				'status'           => (int)($data['status'] ?? 1),
+				'image'            => $data['image'] ?? '',
+				'product_description' => [
+					$language_id => [
+						'name'             => $name,
+						'description'      => $data['description'] ?? '',
+						'meta_title'       => $data['meta_title'] ?? $name,
+						'meta_description' => $data['meta_description'] ?? '',
+						'meta_keyword'     => $data['meta_keyword'] ?? '',
+						'tag'              => ''
+					]
+				],
+				'product_category' => $data['categories'] ?? [],
+				'manufacturer_id'  => (int)($data['manufacturer_id'] ?? 0),
+				'product_special'  => !empty($data['special_price']) ? [[
+					'customer_group_id' => 1,
+					'priority'          => 1,
+					'price'             => (float)$data['special_price'],
+					'date_start'        => '',
+					'date_end'          => ''
+				]] : [],
+				'product_seo_url'  => !empty($data['seo_url']) ? [0 => [$language_id => $data['seo_url']]] : []
+			]);
+
+			$model = $this->loadProductModel();
+			$product_id = $model->addProduct($product_data);
+
+			return [
+				'success'    => true,
+				'message'    => 'Product "' . $name . '" created successfully.',
+				'product_id' => $product_id
+			];
+		} catch (\Throwable $e) {
+			return ['error' => 'Could not create product: ' . $e->getMessage()];
+		}
 	}
 
 	public function importFromCsv(array $rows): array {
@@ -246,6 +241,12 @@ class ProductService {
 			return ['error' => 'Product not found'];
 		}
 
+		$preview = '';
+
+		if (!empty($product['image']) && defined('HTTP_CATALOG')) {
+			$preview = HTTP_CATALOG . 'image/' . $product['image'];
+		}
+
 		return [
 			'success' => true,
 			'data'    => [
@@ -256,7 +257,7 @@ class ProductService {
 				'quantity' => (int)($product['quantity'] ?? 0),
 				'status'   => (int)($product['status'] ?? 0),
 				'image'    => $product['image'] ?? '',
-				'preview'  => !empty($product['image']) ? HTTP_CATALOG . 'image/' . $product['image'] : ''
+				'preview'  => $preview
 			]
 		];
 	}
@@ -376,20 +377,87 @@ class ProductService {
 		return ['success' => true, 'message' => 'Product manufacturer updated.'];
 	}
 
-	public function updateMainImage(int $product_id, string $image_path): array {
-		$data = $this->getFormData($product_id);
+	public function getImageUpdateContext(int $product_id): ?array {
+		$result = $this->get($product_id);
 
-		if (!$data) {
+		if (!empty($result['error']) || empty($result['data'])) {
+			return null;
+		}
+
+		$data = $result['data'];
+
+		return [
+			'product_id'    => $product_id,
+			'name'          => $data['name'] ?? 'Product',
+			'current_image' => $data['image'] ?? '',
+			'preview'       => $data['preview'] ?? ''
+		];
+	}
+
+	public function buildImageUploadPrompt(int $product_id): array {
+		$context = $this->getImageUpdateContext($product_id);
+
+		if (!$context) {
 			return ['error' => 'Product not found'];
 		}
 
-		$data['image'] = $image_path;
-		$this->loadProductModel()->editProduct($product_id, $data);
+		$current_image = $context['current_image'] !== '' ? $context['current_image'] : 'none';
+
+		return [
+			'success'        => true,
+			'message'        => 'Read current product "' . $context['name'] . '" — image: ' . $current_image . '. Upload the new image:',
+			'ui'             => ['type' => 'upload', 'accept' => 'image/*'],
+			'needs_input'    => true,
+			'pending_field'  => 'image',
+			'pending_action' => 'update_product_images',
+			'state_update'   => [
+				'selected_product_id'        => $product_id,
+				'awaiting_product_image_for' => $product_id,
+				'target_product_name'        => $context['name'],
+				'current_product_image'      => $context['current_image'],
+				'step'                       => 'awaiting_product_image',
+				'operation'                  => 'update',
+				'pending_field'              => 'image',
+				'pending_action'             => 'update_product_images',
+				'entity_type'                => 'product'
+			]
+		];
+	}
+
+	public function updateMainImage(int $product_id, string $image_path): array {
+		$context = $this->getImageUpdateContext($product_id);
+
+		if (!$context) {
+			return ['error' => 'Product not found'];
+		}
+
+		$previous_image = $context['current_image'];
+		$db = $this->registry->get('db');
+
+		$db->query("UPDATE `" . DB_PREFIX . "product` SET
+			`image` = '" . $db->escape($image_path) . "',
+			`date_modified` = NOW()
+			WHERE `product_id` = '" . (int)$product_id . "'");
+
+		$updated = $this->loadProductModel()->getProduct($product_id);
+		$saved_image = (string)($updated['image'] ?? '');
+
+		if ($saved_image !== $image_path) {
+			return ['error' => 'Image update did not save. Please try again.'];
+		}
+
+		$previous_label = $previous_image !== '' ? $previous_image : 'none';
 
 		return [
 			'success' => true,
-			'message' => 'Product image updated.',
-			'preview' => HTTP_CATALOG . 'image/' . $image_path
+			'message' => 'Updated image for "' . $context['name'] . '". Previous: ' . $previous_label . ' → New: ' . $image_path . '.',
+			'preview' => HTTP_CATALOG . 'image/' . $image_path,
+			'data'    => [
+				'product_id'     => $product_id,
+				'name'           => $context['name'],
+				'previous_image' => $previous_image,
+				'new_image'      => $image_path
+			]
 		];
 	}
 
@@ -441,7 +509,12 @@ class ProductService {
 
 		$this->loadProductModel()->editProduct($product_id, $data);
 
-		return ['success' => true, 'message' => 'Product updated successfully.'];
+		$name = html_entity_decode($changes['name'] ?? '', ENT_QUOTES | ENT_HTML5, 'UTF-8');
+		$message = $name !== ''
+			? 'Product renamed to "' . $name . '" successfully.'
+			: 'Product updated successfully.';
+
+		return ['success' => true, 'message' => $message];
 	}
 
 	public function exportCsv(int $limit = 500): array {
@@ -473,6 +546,58 @@ class ProductService {
 		return $this->list(['low_stock' => true, 'threshold' => $threshold, 'limit' => $limit]);
 	}
 
+	public function resolveId(string $name): int {
+		$name = trim($name);
+
+		if ($name === '') {
+			return 0;
+		}
+
+		$id = \Opencart\System\Library\Extension\AiBuilder\Chat\IntentHelper::findProductId($this->search($name, 100), $name);
+
+		if ($id) {
+			return $id;
+		}
+
+		return \Opencart\System\Library\Extension\AiBuilder\Chat\IntentHelper::findProductId($this->list(['limit' => 500]), $name);
+	}
+
+	private function buildProductPayload(array $data): array {
+		return array_merge([
+			'master_id'         => 0,
+			'location'          => '',
+			'variant'           => [],
+			'override'          => [],
+			'minimum'           => 1,
+			'subtract'          => 1,
+			'stock_status_id'   => 7,
+			'date_available'    => date('Y-m-d'),
+			'shipping'          => 1,
+			'points'            => 0,
+			'weight'            => 0,
+			'weight_class_id'   => 1,
+			'length'            => 0,
+			'width'             => 0,
+			'height'            => 0,
+			'length_class_id'   => 1,
+			'tax_class_id'      => 0,
+			'sort_order'        => 0,
+			'product_store'     => [0],
+			'product_code'      => [],
+			'product_attribute' => [],
+			'product_option'    => [],
+			'product_discount'  => [],
+			'product_image'     => [],
+			'product_download'  => [],
+			'product_filter'    => [],
+			'product_related'   => [],
+			'product_reward'    => [],
+			'product_layout'    => [],
+			'product_seo_url'   => [],
+			'product_special'   => [],
+		], $data);
+	}
+
 	private function loadProductModel(): object {
 		$loader = $this->registry->get('load');
 		$loader->model('catalog/product');
@@ -481,7 +606,20 @@ class ProductService {
 	}
 
 	private function getLanguageId(): int {
-		return (int)$this->registry->get('config')->get('config_language_id');
+		$language_id = (int)$this->registry->get('config')->get('config_language_id');
+
+		if ($language_id) {
+			return $language_id;
+		}
+
+		$code = (string)($this->registry->get('config')->get('config_language_admin')
+			?: $this->registry->get('config')->get('config_language_catalog')
+			?: 'en-gb');
+
+		$this->registry->get('load')->model('localisation/language');
+		$language = $this->registry->get('model_localisation_language')->getLanguageByCode($code);
+
+		return (int)($language['language_id'] ?? 1);
 	}
 
 	private function getFormData(int $product_id): ?array {

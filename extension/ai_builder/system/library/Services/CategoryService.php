@@ -9,30 +9,44 @@ class CategoryService {
 	}
 
 	public function create(array $data): array {
-		$model = $this->loadCategoryModel();
-		$language_id = $this->getLanguageId();
+		try {
+			$name = trim((string)($data['name'] ?? ''));
 
-		$category_id = $model->addCategory([
-			'parent_id' => (int)($data['parent_id'] ?? 0),
-			'image'     => $data['image'] ?? '',
-			'sort_order' => (int)($data['sort_order'] ?? 0),
-			'status'    => (int)($data['status'] ?? 1),
-			'category_description' => [
-				$language_id => [
-					'name'             => $data['name'] ?? '',
-					'description'      => $data['description'] ?? '',
-					'meta_title'       => $data['meta_title'] ?? $data['name'] ?? '',
-					'meta_description' => $data['meta_description'] ?? '',
-					'meta_keyword'     => ''
-				]
-			],
-			'category_filter'    => [],
-			'category_store'     => [0],
-			'category_seo_url'   => !empty($data['seo_url']) ? [0 => [$language_id => $data['seo_url']]] : [],
-			'category_layout'    => []
-		]);
+			if ($name === '') {
+				return ['error' => 'Category name is required.'];
+			}
 
-		return ['success' => true, 'message' => 'Category created.', 'category_id' => $category_id];
+			$model = $this->loadCategoryModel();
+			$language_id = $this->getLanguageId();
+
+			$category_id = $model->addCategory([
+				'parent_id' => (int)($data['parent_id'] ?? 0),
+				'image'     => $data['image'] ?? '',
+				'sort_order' => (int)($data['sort_order'] ?? 0),
+				'status'    => (int)($data['status'] ?? 1),
+				'category_description' => [
+					$language_id => [
+						'name'             => $name,
+						'description'      => $data['description'] ?? '',
+						'meta_title'       => $data['meta_title'] ?? $name,
+						'meta_description' => $data['meta_description'] ?? '',
+						'meta_keyword'     => ''
+					]
+				],
+				'category_filter'    => [],
+				'category_store'     => [0],
+				'category_seo_url'   => !empty($data['seo_url']) ? [0 => [$language_id => $data['seo_url']]] : [],
+				'category_layout'    => []
+			]);
+
+			return [
+				'success'     => true,
+				'message'     => 'Category "' . $name . '" created successfully.',
+				'category_id' => $category_id
+			];
+		} catch (\Throwable $e) {
+			return ['error' => 'Could not create category: ' . $e->getMessage()];
+		}
 	}
 
 	public function search(string $query, int $limit = 10): array {
@@ -136,7 +150,12 @@ class CategoryService {
 
 		$this->loadCategoryModel()->editCategory($category_id, $data);
 
-		return ['success' => true, 'message' => 'Category updated successfully.'];
+		$name = html_entity_decode($changes['name'] ?? '', ENT_QUOTES | ENT_HTML5, 'UTF-8');
+		$message = $name !== ''
+			? 'Category renamed to "' . $name . '" successfully.'
+			: 'Category updated successfully.';
+
+		return ['success' => true, 'message' => $message];
 	}
 
 	public function delete(int $category_id): array {
@@ -156,7 +175,26 @@ class CategoryService {
 	}
 
 	public function setStatus(int $category_id, int $status): array {
-		return $this->update(['category_id' => $category_id, 'status' => $status]);
+		$model = $this->loadCategoryModel();
+		$category = $model->getCategory($category_id);
+
+		if (!$category) {
+			return ['error' => 'Category not found'];
+		}
+
+		$result = $this->update(['category_id' => $category_id, 'status' => $status]);
+
+		if (!empty($result['error'])) {
+			return $result;
+		}
+
+		$name = html_entity_decode($category['name'] ?? 'Category', ENT_QUOTES | ENT_HTML5, 'UTF-8');
+		$label = $status ? 'enabled' : 'disabled';
+
+		return [
+			'success' => true,
+			'message' => 'Category "' . $name . '" ' . $label . ' successfully.'
+		];
 	}
 
 	public function setParent(int $category_id, int $parent_id): array {
@@ -180,15 +218,33 @@ class CategoryService {
 	}
 
 	public function resolveId(string $name): int {
-		$categories = $this->list(['query' => $name, 'limit' => 5]);
+		$name = trim($name);
 
-		foreach ($categories as $category) {
-			if (strcasecmp($category['name'], $name) === 0 || stripos($category['name'], $name) !== false) {
-				return (int)$category['id'];
+		if ($name === '') {
+			return 0;
+		}
+
+		$id = $this->findIdInCategories($this->list(['query' => $name, 'limit' => 100]), $name);
+
+		if ($id) {
+			return $id;
+		}
+
+		$alpha = preg_replace('/[^a-z]/', '', strtolower($name));
+
+		if ($alpha !== '') {
+			$id = $this->findIdInCategories($this->list(['query' => $alpha, 'limit' => 200]), $name);
+
+			if ($id) {
+				return $id;
 			}
 		}
 
-		return 0;
+		return $this->findIdInCategories($this->list(['limit' => 500]), $name);
+	}
+
+	private function findIdInCategories(array $categories, string $name): int {
+		return \Opencart\System\Library\Extension\AiBuilder\Chat\IntentHelper::findCategoryId($categories, $name);
 	}
 
 	private function loadCategoryModel(): object {
@@ -199,7 +255,20 @@ class CategoryService {
 	}
 
 	private function getLanguageId(): int {
-		return (int)$this->registry->get('config')->get('config_language_id');
+		$language_id = (int)$this->registry->get('config')->get('config_language_id');
+
+		if ($language_id) {
+			return $language_id;
+		}
+
+		$code = (string)($this->registry->get('config')->get('config_language_admin')
+			?: $this->registry->get('config')->get('config_language_catalog')
+			?: 'en-gb');
+
+		$this->registry->get('load')->model('localisation/language');
+		$language = $this->registry->get('model_localisation_language')->getLanguageByCode($code);
+
+		return (int)($language['language_id'] ?? 1);
 	}
 
 	private function getFormData(int $category_id): ?array {

@@ -27,6 +27,7 @@ class CapabilitiesCatalog {
 		self::databaseOps($registry);
 		self::developerTools($registry);
 		self::security($registry);
+		self::adminBridge($registry);
 	}
 
 	private static function add(
@@ -185,8 +186,11 @@ class CapabilitiesCatalog {
 		self::add($registry, 'category_meta', 'Category', 'Update', $cat, 'Update category meta title and description', [
 			'status' => 'implemented', 'triggers' => ['category meta']
 		]);
-		self::add($registry, 'enable_category', 'Category', 'Enable', $cat, 'Enable or disable a category', [
-			'status' => 'implemented', 'triggers' => ['enable category', 'disable category']
+		self::add($registry, 'enable_category', 'Category', 'Enable', $cat, 'Enable a category', [
+			'status' => 'implemented', 'triggers' => ['enable category']
+		]);
+		self::add($registry, 'disable_category', 'Category', 'Disable', $cat, 'Disable a category', [
+			'status' => 'implemented', 'triggers' => ['disable category']
 		]);
 	}
 
@@ -282,9 +286,13 @@ class CapabilitiesCatalog {
 			'status' => 'implemented', 'triggers' => ["today's orders", 'show orders today', "export today's orders"]
 		]);
 
-		self::add($registry, 'view_orders', 'Order', 'Read', $cat, 'View and search orders', ['triggers' => ['view orders', 'list orders']]);
+		self::add($registry, 'view_orders', 'Order', 'Read', $cat, 'View and search orders', [
+			'status' => 'implemented', 'triggers' => ['view orders', 'list orders', 'order details', 'order table', 'show orders']
+		]);
 		self::add($registry, 'create_manual_order', 'Order', 'Create', $cat, 'Create a manual order', ['triggers' => ['create order', 'manual order']]);
-		self::add($registry, 'change_order_status', 'Order', 'Update', $cat, 'Change order status', ['triggers' => ['change order status', 'mark as shipped']]);
+		self::add($registry, 'change_order_status', 'Order', 'Update', $cat, 'Change order status', [
+			'status' => 'implemented', 'triggers' => ['change order status', 'mark as shipped', 'order status to processing']
+		]);
 		self::add($registry, 'generate_invoice', 'Order', 'Export', $cat, 'Generate order invoice', ['triggers' => ['generate invoice', 'print invoice']]);
 		self::add($registry, 'print_packing_slip', 'Order', 'Export', $cat, 'Print packing slip', ['triggers' => ['packing slip']]);
 		self::add($registry, 'refund_order', 'Order', 'Update', $cat, 'Process order refund', ['destructive' => true, 'requires_confirmation' => true, 'triggers' => ['refund order']]);
@@ -497,5 +505,31 @@ class CapabilitiesCatalog {
 		self::add($registry, 'ip_restrictions', 'Security', 'Update', $cat, 'Configure IP restrictions', ['triggers' => ['ip restrictions']]);
 		self::add($registry, 'backup_scheduling', 'Security', 'Update', $cat, 'Schedule automatic backups', ['triggers' => ['backup scheduling']]);
 		self::add($registry, 'audit_logs', 'Security', 'Read', $cat, 'View AI and admin audit logs', ['triggers' => ['audit logs']]);
+	}
+
+	private static function adminBridge(CapabilityRegistry $registry): void {
+		$cat = 'Admin Panel Bridge';
+
+		self::add($registry, 'admin_model_call', 'Admin', 'Execute', $cat, 'Call an OpenCart admin model method (same as admin panel)', [
+			'status' => 'implemented',
+			'triggers' => ['admin model', 'use admin panel model'],
+			'required_inputs' => [
+				'route'  => ['type' => 'string', 'required' => true],
+				'method' => ['type' => 'string', 'required' => true]
+			]
+		]);
+
+		self::add($registry, 'catalog_model_call', 'Admin', 'Execute', $cat, 'Call a catalog model via store instance (orders, checkout)', [
+			'status' => 'implemented',
+			'required_inputs' => [
+				'route'  => ['type' => 'string', 'required' => true],
+				'method' => ['type' => 'string', 'required' => true]
+			]
+		]);
+
+		self::add($registry, 'list_admin_modules', 'Admin', 'Read', $cat, 'List all OpenCart admin model routes available to chat', [
+			'status' => 'implemented',
+			'triggers' => ['list admin modules', 'admin panel access', 'admin model list']
+		]);
 	}
 }

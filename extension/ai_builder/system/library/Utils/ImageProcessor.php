@@ -7,9 +7,10 @@ class ImageProcessor {
 			return ['error' => 'Invalid upload'];
 		}
 
-		$allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+		$mime = $this->detectMimeType($file);
+		$allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml', 'image/jpg', 'image/pjpeg'];
 
-		if (!in_array($file['type'], $allowed)) {
+		if (!in_array($mime, $allowed, true)) {
 			return ['error' => 'Invalid image type. Allowed: JPG, PNG, GIF, WebP, SVG'];
 		}
 
@@ -35,6 +36,38 @@ class ImageProcessor {
 			'filename' => $filename,
 			'url'      => 'image/' . $path
 		];
+	}
+
+	private function detectMimeType(array $file): string {
+		$type = strtolower((string)($file['type'] ?? ''));
+
+		if ($type !== '' && $type !== 'application/octet-stream') {
+			return $type;
+		}
+
+		if (function_exists('finfo_open')) {
+			$finfo = finfo_open(FILEINFO_MIME_TYPE);
+
+			if ($finfo) {
+				$detected = finfo_file($finfo, $file['tmp_name']);
+				finfo_close($finfo);
+
+				if (is_string($detected) && $detected !== '') {
+					return strtolower($detected);
+				}
+			}
+		}
+
+		$ext = strtolower(pathinfo((string)($file['name'] ?? ''), PATHINFO_EXTENSION));
+
+		return match ($ext) {
+			'jpg', 'jpeg' => 'image/jpeg',
+			'png'         => 'image/png',
+			'gif'         => 'image/gif',
+			'webp'        => 'image/webp',
+			'svg'         => 'image/svg+xml',
+			default       => $type,
+		};
 	}
 
 	public function optimize(string $filepath): void {

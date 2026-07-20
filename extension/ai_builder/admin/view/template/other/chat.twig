@@ -1,81 +1,119 @@
-{{ header }}{{ column_left }}
-<div id="content">
-  <div class="page-header">
-    <div class="container-fluid">
-      <div class="float-end">
-        <button class="ai-btn-icon ai-header-btn" id="btn-theme" title="Toggle theme" type="button"><i class="fa-solid fa-moon"></i></button>
-        <a href="{{ url_settings }}" class="btn btn-light"><i class="fa-solid fa-cog"></i> {{ text_settings }}</a>
-      </div>
-      <h1>{{ heading_title }}</h1>
-      <ol class="breadcrumb">
-        {% for breadcrumb in breadcrumbs %}
-          <li class="breadcrumb-item"><a href="{{ breadcrumb.href }}">{{ breadcrumb.text }}</a></li>
-        {% endfor %}
-      </ol>
-    </div>
+{{ header }}
+<div id="ai-page" class="ai-page">
+  {% if not api_configured %}
+  <div class="ai-api-banner">
+    <i class="fa-solid fa-triangle-exclamation"></i>
+    OpenAI API key not configured. <a href="{{ url_settings }}">Add your API key in Settings</a>
   </div>
+  {% endif %}
 
-  <div class="container-fluid">
-    {% if not api_configured %}
-    <div class="alert alert-warning">
-      <i class="fa-solid fa-triangle-exclamation"></i>
-      OpenAI API key not configured. <a href="{{ url_settings }}">Add your API key in Settings</a> to start using the AI assistant.
-    </div>
-    {% endif %}
+  <div id="ai-app" class="ai-app" data-theme="light">
+    <aside class="ai-sidebar" id="ai-sidebar">
+      <div class="ai-sidebar-top">
+        <button class="ai-new-chat" id="btn-new-chat" type="button">
+          <i class="fa-solid fa-plus"></i>
+          <span>New chat</span>
+        </button>
+        <button class="ai-icon-btn ai-sidebar-toggle" id="btn-toggle-sidebar" type="button" title="Close sidebar">
+          <i class="fa-solid fa-bars"></i>
+        </button>
+      </div>
+      <div class="ai-sidebar-search">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="text" placeholder="Search chats..." id="search-chats"/>
+      </div>
+      <div class="ai-chat-list" id="chat-list"></div>
+      <div class="ai-sidebar-bottom">
+        <a href="{{ url_settings }}" class="ai-sidebar-action"><i class="fa-solid fa-gear"></i> Settings</a>
+        <a href="{{ url_dashboard }}" class="ai-sidebar-action"><i class="fa-solid fa-arrow-left"></i> Back to admin</a>
+        <button class="ai-sidebar-action" id="btn-theme" type="button">
+          <i class="fa-solid fa-moon"></i> <span class="ai-theme-label">Dark mode</span>
+        </button>
+      </div>
+    </aside>
 
-    <div id="ai-app" class="ai-chat-embed" data-theme="light">
-      <aside class="ai-sidebar" id="ai-sidebar">
-        <div class="ai-sidebar-header">
-          <button class="ai-btn-icon" id="btn-new-chat" title="New Chat" type="button"><i class="fa-solid fa-plus"></i></button>
-          <span class="ai-logo"><i class="fa-solid fa-robot"></i> Chats</span>
-          <button class="ai-btn-icon" id="btn-toggle-sidebar" title="Toggle sidebar" type="button"><i class="fa-solid fa-bars"></i></button>
+    <main class="ai-main">
+      <header class="ai-topbar">
+        <button class="ai-icon-btn" id="btn-open-sidebar" type="button" title="Open sidebar">
+          <i class="fa-solid fa-bars"></i>
+        </button>
+        <div class="ai-topbar-title">
+          <i class="fa-solid fa-wand-magic-sparkles"></i>
+          Website Builder
         </div>
-        <div class="ai-sidebar-search">
-          <i class="fa-solid fa-magnifying-glass"></i>
-          <input type="text" placeholder="Search chats..." id="search-chats"/>
+        <div class="ai-topbar-actions">
+          <a href="{{ url_settings }}" class="ai-icon-btn" title="Settings"><i class="fa-solid fa-gear"></i></a>
         </div>
-        <div class="ai-chat-list" id="chat-list"></div>
-      </aside>
+      </header>
 
-      <main class="ai-main">
+      <div class="ai-messages-wrap">
         <div class="ai-messages" id="messages">
           <div class="ai-welcome">
-            <div class="ai-welcome-icon"><i class="fa-solid fa-robot"></i></div>
-            <h2>Website Builder Assistant</h2>
-            <p>Manage your entire OpenCart store through natural language. Try these commands:</p>
+            <h1 class="ai-welcome-title">What can I help you build today?</h1>
+            <p class="ai-welcome-sub">Manage your entire OpenCart admin panel through chat — products, categories, banners, orders, customers, coupons, and settings.</p>
             <div class="ai-suggestions">
-              <button class="ai-suggestion" type="button" data-msg="Change homepage banner">Change homepage banner</button>
-              <button class="ai-suggestion" type="button" data-msg="Delete homepage banner slide">Delete banner slide</button>
-              <button class="ai-suggestion" type="button" data-msg="Add new product">Add new product</button>
-              <button class="ai-suggestion" type="button" data-msg="Show today's orders">Show today's orders</button>
-              <button class="ai-suggestion" type="button" data-msg="Find customer">Find customer</button>
-              <button class="ai-suggestion" type="button" data-msg="Create coupon">Create coupon</button>
-              <button class="ai-suggestion" type="button" data-msg="Increase all prices by 5%">Bulk price update</button>
+              <button class="ai-suggestion" type="button" data-msg="Show all commands">
+                <span class="ai-suggestion-title">Show all commands</span>
+                <span class="ai-suggestion-desc">Quick chat shortcuts for common tasks</span>
+              </button>
+              <button class="ai-suggestion" type="button" data-msg="List admin modules">
+                <span class="ai-suggestion-title">Admin panel access</span>
+                <span class="ai-suggestion-desc">See all OpenCart admin models the chat can use</span>
+              </button>
+              <button class="ai-suggestion" type="button" data-msg="Change homepage banner">
+                <span class="ai-suggestion-title">Change homepage banner</span>
+                <span class="ai-suggestion-desc">Replace or update banner slides</span>
+              </button>
+              <button class="ai-suggestion" type="button" data-msg="Product list in table form">
+                <span class="ai-suggestion-title">Product list</span>
+                <span class="ai-suggestion-desc">List products as a table</span>
+              </button>
+              <button class="ai-suggestion" type="button" data-msg="Category list">
+                <span class="ai-suggestion-title">Category list</span>
+                <span class="ai-suggestion-desc">View and manage categories</span>
+              </button>
+              <button class="ai-suggestion" type="button" data-msg="Order details table">
+                <span class="ai-suggestion-title">Order details table</span>
+                <span class="ai-suggestion-desc">View orders in a table with status &amp; totals</span>
+              </button>
+              <button class="ai-suggestion" type="button" data-msg="Find customer">
+                <span class="ai-suggestion-title">Find customer</span>
+                <span class="ai-suggestion-desc">Search customers by name or email</span>
+              </button>
+              <button class="ai-suggestion" type="button" data-msg="Create coupon 10% off">
+                <span class="ai-suggestion-title">Create coupon</span>
+                <span class="ai-suggestion-desc">Set up a discount code</span>
+              </button>
+              <button class="ai-suggestion" type="button" data-msg="Increase all prices by 5%">
+                <span class="ai-suggestion-title">Bulk price update</span>
+                <span class="ai-suggestion-desc">Adjust prices across products</span>
+              </button>
             </div>
           </div>
         </div>
+      </div>
 
-        <div class="ai-input-area">
-          <div class="ai-dropzone" id="dropzone">
-            <i class="fa-solid fa-cloud-arrow-up"></i>
-            <span>Drop files here to upload</span>
-          </div>
+      <div class="ai-composer">
+        <div class="ai-dropzone" id="dropzone">
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+          <span>Drop files here to upload</span>
+        </div>
+        <div class="ai-composer-inner">
           <div class="ai-input-wrap">
-            <button class="ai-btn-icon" id="btn-attach" title="Attach file" type="button"><i class="fa-solid fa-paperclip"></i></button>
+            <button class="ai-icon-btn ai-attach-btn" id="btn-attach" title="Attach file" type="button">
+              <i class="fa-solid fa-paperclip"></i>
+            </button>
             <input type="file" id="file-input" hidden accept="image/*,.csv,.xlsx,.xls,.pdf"/>
             <textarea id="message-input" placeholder="{{ text_placeholder }}" rows="1"></textarea>
-            <button class="ai-btn-send" id="btn-send" title="Send" type="button"><i class="fa-solid fa-paper-plane"></i></button>
+            <button class="ai-send-btn" id="btn-send" title="Send" type="button" disabled>
+              <i class="fa-solid fa-arrow-up"></i>
+            </button>
           </div>
-          <div class="ai-input-hint">AI can make mistakes. Verify important changes. Supports images, CSV, Excel, PDF.</div>
+          <p class="ai-composer-hint">AI can make mistakes. Verify important changes. Supports images, CSV, Excel, PDF.</p>
         </div>
-      </main>
-    </div>
+      </div>
+    </main>
   </div>
-</div>
-
-<div class="ai-typing" id="typing-indicator" hidden>
-  <div class="ai-typing-dots"><span></span><span></span><span></span></div>
-  <span>{{ text_typing }}</span>
 </div>
 
 <script>
@@ -89,8 +127,9 @@
     url_history: '{{ url_history }}',
     url_new_session: '{{ url_new_session }}',
     url_csv_template: '{{ url_csv_template }}',
-    api_configured: {{ api_configured ? 'true' : 'false' }}
+    api_configured: {{ api_configured ? 'true' : 'false' }},
+    typing_text: '{{ text_typing|escape('js') }}'
   };
 </script>
-<script src="../extension/ai_builder/admin/view/javascript/chat.js?v=1.3.0" type="text/javascript"></script>
+<script src="../extension/ai_builder/admin/view/javascript/chat.js?v=2.8.2" type="text/javascript"></script>
 {{ footer }}
